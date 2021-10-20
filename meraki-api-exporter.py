@@ -120,8 +120,8 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         if "/organizations" in self.path:   # Generating list ov avialable organizations for API keys.
             org_list = list()
             get_organizarions(org_list, dashboard)
-            responce = "- targets:\n   - " + "\n   - ".join(org_list)
-            self.wfile.write(responce.encode('utf-8'))
+            response = "- targets:\n   - " + "\n   - ".join(org_list)
+            self.wfile.write(response.encode('utf-8'))
             self.wfile.write("\n".encode('utf-8'))
             return
 
@@ -151,12 +151,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                            'not connected': 3,
                            'failed': 4}
 
-        responce = "# TYPE meraki_device_latency gauge\n" + \
-                   "# TYPE meraki_device_loss_percent gauge\n" + \
-                   "# TYPE meraki_device_status gauge\n" + \
-                   "# TYPE meraki_device_uplink_status gauge\n" + \
-                   "# TYPE meraki_device_using_cellular_failover gauge\n"
-
+        host_metric_dict = {
+          'meraki_device_latency': [],
+          'meraki_device_loss_percent': [],
+          'meraki_device_status': [],
+          'meraki_device_using_cellular_failover': [],
+          'meraki_device_uplink_status': []
+        }
         for host in host_stats.keys():
             try:
                 target = '{serial="' + host + \
@@ -170,27 +171,34 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             # values={ 'latencyMs': lambda a : str(a)}
             try:
                 if host_stats[host]['latencyMs'] is not None:
-                    responce = responce + 'meraki_device_latency' + target + '} ' + str(host_stats[host]['latencyMs']/1000) + '\n'
+                    host_metric_dict['meraki_device_latency'].append('meraki_device_latency' + target + '} ' + str(host_stats[host]['latencyMs']/1000))
                 if host_stats[host]['lossPercent'] is not None:
-                    responce = responce + 'meraki_device_loss_percent' + target + '} ' + str(host_stats[host]['lossPercent']) + '\n'
+                    host_metric_dict['meraki_device_loss_percent'].append('meraki_device_loss_percent' + target + '} ' + str(host_stats[host]['lossPercent']))
             except KeyError:
                 pass
             try:
-                responce = responce + 'meraki_device_status' + target + '} ' + ('1' if host_stats[host]['status'] == 'online' else '0') + '\n'
+                host_metric_dict['meraki_device_status'].append('meraki_device_status' + target + '} ' + ('1' if host_stats[host]['status'] == 'online' else '0'))
             except KeyError:
                 pass
             try:
-                responce = responce + 'meraki_device_using_cellular_failover' + target + '} ' + ('1' if host_stats[host]['usingCellularFailover'] else '0') + '\n'
+                host_metric_dict['meraki_device_using_cellular_failover'].append('meraki_device_using_cellular_failover' + target + '} ' + ('1' if host_stats[host]['usingCellularFailover'] else '0'))
             except KeyError:
                 pass
             if 'uplinks' in host_stats[host]:
                 for uplink in host_stats[host]['uplinks'].keys():
-                    responce = responce + 'meraki_device_uplink_status' + target + ',uplink="' + uplink + '"} ' + str(uplink_statuses[host_stats[host]['uplinks'][uplink]]) + '\n'
+                    host_metric_dict['meraki_device_uplink_status'].append('meraki_device_uplink_status' + target + ',uplink="' + uplink + '"} ' + str(uplink_statuses[host_stats[host]['uplinks'][uplink]]))
 
-        responce = responce + '# TYPE request_processing_seconds summary\n'
-        responce = responce + 'request_processing_seconds ' + str(time.monotonic() - start_time) + '\n'
+        response = ""
+        for metric in host_metric_dict.keys():
+            response = response + f'# TYPE {metric} gauge\n'
+            for metric_value in host_metric_dict[metric]:
+                response = response + metric_value + '\n'
+            response = response + '\n'
 
-        self.wfile.write(responce.encode('utf-8'))
+        response = response + '# TYPE request_processing_seconds summary\n'
+        response = response + 'request_processing_seconds ' + str(time.monotonic() - start_time) + '\n'
+
+        self.wfile.write(response.encode('utf-8'))
 
     def do_HEAD(self):
         self._set_headers()
