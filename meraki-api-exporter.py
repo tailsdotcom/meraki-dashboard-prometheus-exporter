@@ -193,11 +193,10 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             response = response + f'# TYPE {metric} gauge\n'
             for metric_value in host_metric_dict[metric]:
                 response = response + metric_value + '\n'
-            response = response + '\n'
 
-        response = response + '# TYPE request_processing_seconds summary\n'
+        response = response + '# TYPE request_processing_seconds gauge\n'
         response = response + 'request_processing_seconds ' + str(time.monotonic() - start_time) + '\n'
-
+        response = response + '# EOF'
         self.wfile.write(response.encode('utf-8'))
 
     def do_HEAD(self):
