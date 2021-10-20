@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - master
+      - feature/**
 
 jobs:
   docker_publish:
