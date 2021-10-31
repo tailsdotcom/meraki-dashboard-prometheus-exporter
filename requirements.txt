@@ -1,2 +1,4 @@
 meraki~=1.0
 ConfigArgParse~=1.5.3
+requests
+Flask~=2.0

@@ -115,7 +115,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             return()
 
         self._set_headers()
-        dashboard = meraki.DashboardAPI(API_KEY, output_log=False, print_console=True)
+        dashboard = meraki.DashboardAPI(API_KEY, base_url=API_URL, output_log=False, print_console=True)
 
         if "/organizations" in self.path:   # Generating list ov avialable organizations for API keys.
             org_list = list()
@@ -210,17 +210,20 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    parser = configargparse.ArgumentParser(description='Per-User traffic stats Pronethetius exporter for Meraki API.')
+    parser = configargparse.ArgumentParser(description='Per-User traffic stats Prometheus exporter for Meraki API.')
     parser.add_argument('-k', metavar='API_KEY', type=str, required=True,
                         env_var='MERAKI_API_KEY', help='API Key')
     parser.add_argument('-p', metavar='http_port', type=int, default=9822,
                         help='HTTP port to listen for Prometheus scraper, default 9822')
     parser.add_argument('-i', metavar='bind_to_ip', type=str, default="",
                         help='IP address where HTTP server will listen, default all interfaces')
+    parser.add_argument('-m', metavar='API_URL', type=str, help='The URL to use for the Meraki API',
+                        default="https://api.meraki.com/api/v1")
     args = vars(parser.parse_args())
     HTTP_PORT_NUMBER = args['p']
     HTTP_BIND_IP = args['i']
     API_KEY = args['k']
+    API_URL = args['m']
 
     # starting server
     server_class = MyHandler
