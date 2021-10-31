@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 import requests
+from prometheus_client.openmetrics import parser
 
 
 class Test(unittest.TestCase):
@@ -45,6 +46,11 @@ class Test(unittest.TestCase):
 
     def test_get_metrics(self):
         response = requests.get('http://127.0.0.1:9822/?target=1234')
+
+        # Validate against OpenMetrics Spec
+        parser.text_string_to_metric_families(response.text)
+
+        # Remove unpredictable response time metric and compare to response text file
         response_sanitised = re.sub(r"request_processing_seconds [\d]+.[\d]+", "request_processing_seconds 0.01",
                                     response.text)
         expected_response = Path('integration_text_response.txt').read_text()

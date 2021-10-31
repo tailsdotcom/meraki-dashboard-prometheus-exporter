@@ -65,6 +65,7 @@ def get_organization_devices_statuses():
     }
 ]"""
 
+
 @app.route("/api/v1/organizations/1234/devices/uplinksLossAndLatency")
 def get_organization_devices_uplinks_loss_and_latency():
     return """[
