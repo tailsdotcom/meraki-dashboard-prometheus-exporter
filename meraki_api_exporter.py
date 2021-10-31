@@ -1,38 +1,32 @@
-import http.server
 import threading
 import time
 
 import configargparse
 import meraki
+from prometheus_client import Gauge, start_http_server
 
 
 def get_devices(devices, dashboard, organizationId):
-    devices.extend(dashboard.organizations.getOrganizationDevicesStatuses(organizationId=organizationId, total_pages="all"))
+    devices.extend(
+        dashboard.organizations.getOrganizationDevicesStatuses(organizationId=organizationId, total_pages="all"))
     print('Got', len(devices), 'Devices')
 
 
 def get_device_statuses(devicesdtatuses, dashboard, organizationId):
-    devicesdtatuses.extend(dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(organizationId=organizationId, ip='8.8.8.8', timespan="120", total_pages="all"))
+    devicesdtatuses.extend(
+        dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(organizationId=organizationId, ip='8.8.8.8',
+                                                                            timespan="120", total_pages="all"))
     print('Got ', len(devicesdtatuses), 'Device Statuses')
 
 
 def get_uplink_statuses(uplinkstatuses, dashboard, organizationId):
-    uplinkstatuses.extend(dashboard.appliance.getOrganizationApplianceUplinkStatuses(organizationId=organizationId, total_pages="all"))
+    uplinkstatuses.extend(
+        dashboard.appliance.getOrganizationApplianceUplinkStatuses(organizationId=organizationId, total_pages="all"))
     print('Got ', len(uplinkstatuses), 'Uplink Statuses')
 
 
 def get_organizarion(org_data, dashboard, organizationId):
     org_data.update(dashboard.organizations.getOrganization(organizationId=organizationId))
-
-
-def get_organizarions(orgs_list, dashboard):
-    response = dashboard.organizations.getOrganizations()
-    for org in response:  # If you know better way to check that API key has access to an Org, please let me know. (This will rate throtled big time )
-        try:
-            dashboard.organizations.getOrganizationApiRequestsOverview(organizationId=org['id'])
-            orgs_list.append(org['id'])
-        except meraki.exceptions.APIError:
-            pass
 
 
 def get_usage(dashboard, organizationId):
@@ -63,7 +57,8 @@ def get_usage(dashboard, organizationId):
     print('Combining collected data\n')
 
     the_list = {}
-    values_list = ['name', 'model', 'mac', 'wan1Ip', 'wan2Ip', 'lanIp', 'publicIp', 'networkId', 'status', 'usingCellularFailover']
+    values_list = ['name', 'model', 'mac', 'wan1Ip', 'wan2Ip', 'lanIp', 'publicIp', 'networkId', 'status',
+                   'usingCellularFailover']
     for device in devices:
         the_list[device['serial']] = {}
         the_list[device['serial']]['orgName'] = org_data['name']
@@ -93,120 +88,82 @@ def get_usage(dashboard, organizationId):
             the_list[device['serial']]['uplinks'][uplink['interface']] = uplink['status']
 
     print('Done')
-    return(the_list)
+    return (the_list)
+
+
 # end of get_usage()
 
 
-class MyHandler(http.server.BaseHTTPRequestHandler):
-    def _set_headers(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain; charset=utf-8')
-        self.end_headers()
+REQUEST_TIME = Gauge('request_processing_seconds', 'Time spent processing request')
+label_list = ['serial', 'name', 'networkId', 'orgName', 'orgId']
+latency_metric = Gauge('meraki_device_latency', 'Latency', label_list)
+loss_metric = Gauge('meraki_device_loss_percent', 'Loss Percent', label_list)
+device_status_metric = Gauge('meraki_device_status', 'Device Status', label_list)
+cellular_failover_metric = Gauge('meraki_device_using_cellular_failover', 'Cellular Failover', label_list)
+device_uplink_status_metric = Gauge('meraki_device_uplink_status', 'Device Uplink Status', label_list + ['uplink'])
 
-    def _set_headers_404(self):
-        self.send_response(404)
-        self.send_header('Content-type', 'text/plain; charset=utf-8')
-        self.end_headers()
 
-    def do_GET(self):
+@REQUEST_TIME.time()
+def update_metrics():
+    dashboard = meraki.DashboardAPI(API_KEY, base_url=API_URL, output_log=False, print_console=True)
+    organizationId = ORG_ID
 
-        if "/?target=" not in self.path and "/organizations" not in self.path:
-            self._set_headers_404()
-            return()
+    host_stats = get_usage(dashboard, organizationId)
+    print("Reporting on:", len(host_stats), "hosts")
+    '''{ 'latencyMs': 23.7,
+         'lossPercent': 0.0,
+         'name': 'TestSite',
+         'mac': 'e0:cb:00:00:00:00'
+         'networkId': 'L_12345678',
+         'publicIp': '1.2.3.4',
+         'status': 'online',
+         'uplinks': {'cellular': 'ready', 'wan1': 'active'},
+         'usingCellularFailover': False,
+         'wan1Ip': '1.2.3.4'}
+    '''
+    # uplink statuses
+    uplink_statuses = {'active': 0,
+                       'ready': 1,
+                       'connecting': 2,
+                       'not connected': 3,
+                       'failed': 4}
 
-        self._set_headers()
-        dashboard = meraki.DashboardAPI(API_KEY, base_url=API_URL, output_log=False, print_console=True)
+    for host in host_stats.keys():
+        try:
+            name_label = host_stats[host]['name'] if host_stats[host]['name'] != "" else host_stats[host]['mac']
+            latency_metric.labels(host, name_label, host_stats[host]['networkId'], host_stats[host]['orgName'],
+                                  organizationId)
+        except KeyError:
+            break
+        # values={ 'latencyMs': lambda a : str(a)}
+        try:
+            if host_stats[host]['latencyMs'] is not None:
+                latency_metric.labels(host, name_label, host_stats[host]['networkId'], host_stats[host]['orgName'],
+                                      organizationId).set(host_stats[host]['latencyMs'] / 1000)
 
-        if "/organizations" in self.path:   # Generating list ov avialable organizations for API keys.
-            org_list = list()
-            get_organizarions(org_list, dashboard)
-            response = "- targets:\n   - " + "\n   - ".join(org_list)
-            self.wfile.write(response.encode('utf-8'))
-            self.wfile.write("\n".encode('utf-8'))
-            return
-
-        dest_orgId = self.path.split('=')[1]
-        print('Target: ', dest_orgId)
-        organizationId = str(dest_orgId)
-
-        start_time = time.monotonic()
-
-        host_stats = get_usage(dashboard, organizationId)
-        print("Reporting on:", len(host_stats), "hosts")
-        '''{ 'latencyMs': 23.7,
-             'lossPercent': 0.0,
-             'name': 'TestSite',
-             'mac': 'e0:cb:00:00:00:00'
-             'networkId': 'L_12345678',
-             'publicIp': '1.2.3.4',
-             'status': 'online',
-             'uplinks': {'cellular': 'ready', 'wan1': 'active'},
-             'usingCellularFailover': False,
-             'wan1Ip': '1.2.3.4'}
-        '''
-        # uplink statuses
-        uplink_statuses = {'active': 0,
-                           'ready': 1,
-                           'connecting': 2,
-                           'not connected': 3,
-                           'failed': 4}
-
-        host_metric_dict = {
-          'meraki_device_latency': [],
-          'meraki_device_loss_percent': [],
-          'meraki_device_status': [],
-          'meraki_device_using_cellular_failover': [],
-          'meraki_device_uplink_status': []
-        }
-        for host in host_stats.keys():
-            try:
-                target = '{serial="' + host + \
-                         '",name="' + (host_stats[host]['name'] if host_stats[host]['name'] != "" else host_stats[host]['mac'] ) + \
-                         '",networkId="' + host_stats[host]['networkId'] + \
-                         '",orgName="' + host_stats[host]['orgName'] + \
-                         '",orgId="' + organizationId + \
-                         '"'
-            except KeyError:
-                break
-            # values={ 'latencyMs': lambda a : str(a)}
-            try:
-                if host_stats[host]['latencyMs'] is not None:
-                    host_metric_dict['meraki_device_latency'].append('meraki_device_latency' + target + '} ' + str(host_stats[host]['latencyMs']/1000))
-                if host_stats[host]['lossPercent'] is not None:
-                    host_metric_dict['meraki_device_loss_percent'].append('meraki_device_loss_percent' + target + '} ' + str(host_stats[host]['lossPercent']))
-            except KeyError:
-                pass
-            try:
-                host_metric_dict['meraki_device_status'].append('meraki_device_status' + target + '} ' + ('1' if host_stats[host]['status'] == 'online' else '0'))
-            except KeyError:
-                pass
-            try:
-                host_metric_dict['meraki_device_using_cellular_failover'].append('meraki_device_using_cellular_failover' + target + '} ' + ('1' if host_stats[host]['usingCellularFailover'] else '0'))
-            except KeyError:
-                pass
-            if 'uplinks' in host_stats[host]:
-                for uplink in host_stats[host]['uplinks'].keys():
-                    host_metric_dict['meraki_device_uplink_status'].append('meraki_device_uplink_status' + target + ',uplink="' + uplink + '"} ' + str(uplink_statuses[host_stats[host]['uplinks'][uplink]]))
-
-        response = ""
-        for metric in host_metric_dict.keys():
-            response = response + f'# TYPE {metric} gauge\n'
-            for metric_value in host_metric_dict[metric]:
-                response = response + metric_value + '\n'
-
-        response = response + '# TYPE request_processing_seconds gauge\n'
-        response = response + 'request_processing_seconds ' + str(time.monotonic() - start_time) + '\n'
-        response = response + '# EOF'
-        self.wfile.write(response.encode('utf-8'))
-
-    def do_HEAD(self):
-        self._set_headers()
-
-    def do_POST(self):
-        # Doesn't do anything with posted data
-        self._set_headers_404()
-        return()
-        self._set_headers()
+            if host_stats[host]['lossPercent'] is not None:
+                loss_metric.labels(host, name_label, host_stats[host]['networkId'], host_stats[host]['orgName'],
+                                   organizationId).set(host_stats[host]['lossPercent'])
+        except KeyError:
+            pass
+        try:
+            device_status_metric.labels(host, name_label, host_stats[host]['networkId'], host_stats[host]['orgName'],
+                                        organizationId).set('1' if host_stats[host]['status'] == 'online' else '0')
+        except KeyError:
+            pass
+        try:
+            cellular_failover_metric.labels(host, name_label, host_stats[host]['networkId'],
+                                            host_stats[host]['orgName'],
+                                            organizationId).set(
+                '1' if host_stats[host]['usingCellularFailover'] else '0')
+        except KeyError:
+            pass
+        if 'uplinks' in host_stats[host]:
+            for uplink in host_stats[host]['uplinks'].keys():
+                device_uplink_status_metric.labels(host, name_label, host_stats[host]['networkId'],
+                                                   host_stats[host]['orgName'],
+                                                   organizationId, uplink).set(
+                    uplink_statuses[host_stats[host]['uplinks'][uplink]])
 
 
 if __name__ == '__main__':
@@ -219,20 +176,18 @@ if __name__ == '__main__':
                         help='IP address where HTTP server will listen, default all interfaces')
     parser.add_argument('-m', metavar='API_URL', type=str, help='The URL to use for the Meraki API',
                         default="https://api.meraki.com/api/v1")
+    parser.add_argument('-o', metavar='ORG_ID', type=str, help='The Meraki API Organization ID',
+                        default="1234")
     args = vars(parser.parse_args())
     HTTP_PORT_NUMBER = args['p']
     HTTP_BIND_IP = args['i']
     API_KEY = args['k']
     API_URL = args['m']
+    ORG_ID = args['o']
 
-    # starting server
-    server_class = MyHandler
-    httpd = http.server.ThreadingHTTPServer((HTTP_BIND_IP, HTTP_PORT_NUMBER), server_class)
-    print(time.asctime(), "Server Starts - %s:%s" % ("*" if HTTP_BIND_IP == '' else HTTP_BIND_IP, HTTP_PORT_NUMBER))
-    httpd.serve_forever()
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    httpd.server_close()
-    print(time.asctime(), "Server Stops - %s:%s" % ("localhost", HTTP_PORT_NUMBER))
+    # Start up the server to expose the metrics.
+    start_http_server(HTTP_PORT_NUMBER, addr=HTTP_BIND_IP)
+
+    while True:
+        update_metrics()
+        time.sleep(30)
