@@ -13,6 +13,6 @@ RUN useradd -M app
 USER app
 
 # Add and run python app
-COPY meraki-api-exporter.py .
-ENTRYPOINT ["python", "meraki-api-exporter.py"]
+COPY meraki_api_exporter.py .
+ENTRYPOINT ["python", "meraki_api_exporter.py"]
 CMD []
