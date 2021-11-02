@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 
@@ -7,39 +8,51 @@ from prometheus_client import Gauge, start_http_server
 
 
 def get_devices(devices, dashboard, organizationId):
-    devices.extend(
-        dashboard.organizations.getOrganizationDevicesStatuses(
-            organizationId=organizationId, total_pages="all"
+    try:
+        devices.extend(
+            dashboard.organizations.getOrganizationDevicesStatuses(
+                organizationId=organizationId, total_pages="all"
+            )
         )
-    )
-    print("Got", len(devices), "Devices")
+        logging.info(f"Got {len(devices)} Devices")
+    except meraki.APIError as api_error:
+        logging.warning(api_error)
 
 
 def get_device_statuses(devicesdtatuses, dashboard, organizationId):
-    devicesdtatuses.extend(
-        dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(
-            organizationId=organizationId,
-            ip="8.8.8.8",
-            timespan="120",
-            total_pages="all",
+    try:
+        devicesdtatuses.extend(
+            dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(
+                organizationId=organizationId,
+                ip="8.8.8.8",
+                timespan="120",
+                total_pages="all",
+            )
         )
-    )
-    print("Got ", len(devicesdtatuses), "Device Statuses")
+        logging.info(f"Got {len(devicesdtatuses)} Device Statuses")
+    except meraki.APIError as api_error:
+        logging.warning(api_error)
 
 
 def get_uplink_statuses(uplinkstatuses, dashboard, organizationId):
-    uplinkstatuses.extend(
-        dashboard.appliance.getOrganizationApplianceUplinkStatuses(
-            organizationId=organizationId, total_pages="all"
+    try:
+        uplinkstatuses.extend(
+            dashboard.appliance.getOrganizationApplianceUplinkStatuses(
+                organizationId=organizationId, total_pages="all"
+            )
         )
-    )
-    print("Got ", len(uplinkstatuses), "Uplink Statuses")
+        logging.info(f"Got {len(uplinkstatuses)} Uplink Statuses")
+    except meraki.APIError as api_error:
+        logging.warning(api_error)
 
 
 def get_organizarion(org_data, dashboard, organizationId):
-    org_data.update(
-        dashboard.organizations.getOrganization(organizationId=organizationId)
-    )
+    try:
+        org_data.update(
+            dashboard.organizations.getOrganization(organizationId=organizationId)
+        )
+    except meraki.APIError as api_error:
+        logging.warning(api_error)
 
 
 def get_usage(dashboard, organizationId):
@@ -73,7 +86,7 @@ def get_usage(dashboard, organizationId):
     t3.join()
     t4.join()
 
-    print("Combining collected data\n")
+    logging.info("Combining collected data")
 
     the_list = {}
     values_list = [
@@ -124,7 +137,7 @@ def get_usage(dashboard, organizationId):
                 "status"
             ]
 
-    print("Done")
+    logging.info("Done")
     return the_list
 
 
@@ -146,13 +159,11 @@ device_uplink_status_metric = Gauge(
 
 @REQUEST_TIME.time()
 def update_metrics():
-    dashboard = meraki.DashboardAPI(
-        API_KEY, base_url=API_URL, output_log=False, print_console=True
-    )
+    dashboard = meraki.DashboardAPI(API_KEY, base_url=API_URL, suppress_logging=True)
     organizationId = ORG_ID
 
     host_stats = get_usage(dashboard, organizationId)
-    print("Reporting on:", len(host_stats), "hosts")
+    logging.info(f"Reporting on: {len(host_stats)} hosts")
     """{ 'latencyMs': 23.7,
          'lossPercent': 0.0,
          'name': 'TestSite',
@@ -243,6 +254,9 @@ def update_metrics():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     parser = configargparse.ArgumentParser(
         description="Per-User traffic stats Prometheus exporter for Meraki API."
     )
