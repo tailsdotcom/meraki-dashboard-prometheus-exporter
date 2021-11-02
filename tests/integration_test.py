@@ -36,7 +36,7 @@ class Test(unittest.TestCase):
             try:
                 requests.get("http://127.0.0.1:9822/", timeout=0.5)
                 requests.get("http://127.0.0.1:9823/", timeout=0.5)
-                time.sleep(5) # Give it a few more seconds for luck
+                time.sleep(5)  # Give it a few more seconds for luck
                 break
             except requests.exceptions.ConnectionError:
                 pass

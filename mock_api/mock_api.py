@@ -124,5 +124,5 @@ def get_organization_devices_uplink_statuses():
 ]"""
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="127.0.0.1", port=9823, debug=True)
