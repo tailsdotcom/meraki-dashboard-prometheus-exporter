@@ -67,8 +67,12 @@ class Test(unittest.TestCase):
                     self.assertEqual(sample[1]["orgId"], "1234")
                     self.assertEqual(sample[1]["orgName"], "My organization")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
-                    self.assertEqual(sample[2], 0.19490000000000002)
-                    if_count += 1
+                    if sample[1]["uplink"] == "wan1":
+                        self.assertEqual(sample[2], 0.19490000000000002)
+                        if_count += 1
+                    elif sample[1]["uplink"] == "cellular":
+                        self.assertEqual(sample[2], 0.2555)
+                        if_count += 1
 
                 elif sample[0] == "meraki_device_loss_percent":
                     self.assertEqual(sample[1]["name"], "My AP")
@@ -76,8 +80,12 @@ class Test(unittest.TestCase):
                     self.assertEqual(sample[1]["orgId"], "1234")
                     self.assertEqual(sample[1]["orgName"], "My organization")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
-                    self.assertEqual(sample[2], 5.3)
-                    if_count += 1
+                    if sample[1]["uplink"] == "wan1":
+                        self.assertEqual(sample[2], 5.3)
+                        if_count += 1
+                    elif sample[1]["uplink"] == "cellular":
+                        self.assertEqual(sample[2], 1.2)
+                        if_count += 1
 
                 elif sample[0] == "meraki_device_status":
                     self.assertEqual(sample[1]["name"], "My AP")
@@ -112,4 +120,4 @@ class Test(unittest.TestCase):
                         if_count += 1
 
         # Check all conditional paths are explored
-        self.assertEqual(if_count, 6)
+        self.assertEqual(if_count, 8)

@@ -81,6 +81,19 @@ def get_organization_devices_uplinks_loss_and_latency():
                 "latencyMs": 194.9
             }
         ]
+    },
+    {
+        "networkId": "N_24329156",
+        "serial": "Q234-ABCD-5678",
+        "uplink": "cellular",
+        "ip": "8.8.8.8",
+        "timeSeries": [
+            {
+                "ts": "2019-01-31T18:46:14Z",
+                "lossPercent": 1.2,
+                "latencyMs": 255.5
+            }
+        ]
     }
 ]"""
 
