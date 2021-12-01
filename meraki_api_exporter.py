@@ -19,9 +19,9 @@ def get_devices(devices, dashboard, organizationId):
         logging.warning(api_error)
 
 
-def get_device_statuses(devicesdtatuses, dashboard, organizationId):
+def get_device_statuses(devicestatuses, dashboard, organizationId):
     try:
-        devicesdtatuses.extend(
+        devicestatuses.extend(
             dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(
                 organizationId=organizationId,
                 ip="8.8.8.8",
@@ -29,7 +29,7 @@ def get_device_statuses(devicesdtatuses, dashboard, organizationId):
                 total_pages="all",
             )
         )
-        logging.info(f"Got {len(devicesdtatuses)} Device Statuses")
+        logging.info(f"Got {len(devicestatuses)} Device Statuses")
     except meraki.APIError as api_error:
         logging.warning(api_error)
 
@@ -46,7 +46,7 @@ def get_uplink_statuses(uplinkstatuses, dashboard, organizationId):
         logging.warning(api_error)
 
 
-def get_organizarion(org_data, dashboard, organizationId):
+def get_organization(org_data, dashboard, organizationId):
     try:
         org_data.update(
             dashboard.organizations.getOrganization(organizationId=organizationId)
@@ -57,27 +57,27 @@ def get_organizarion(org_data, dashboard, organizationId):
 
 def get_usage(dashboard, organizationId):
     # launching threads to collect data.
-    # if more indexes is requred it is good time to conver it to loop.
+    # if more indexes is required it is good time to convert it to loop.
 
     devices = []
     t1 = threading.Thread(target=get_devices, args=(devices, dashboard, organizationId))
     t1.start()
 
-    devicesdtatuses = []
+    device_statuses = []
     t2 = threading.Thread(
-        target=get_device_statuses, args=(devicesdtatuses, dashboard, organizationId)
+        target=get_device_statuses, args=(device_statuses, dashboard, organizationId)
     )
     t2.start()
 
-    uplinkstatuses = []
+    uplink_statuses = []
     t3 = threading.Thread(
-        target=get_uplink_statuses, args=(uplinkstatuses, dashboard, organizationId)
+        target=get_uplink_statuses, args=(uplink_statuses, dashboard, organizationId)
     )
     t3.start()
 
     org_data = {}
     t4 = threading.Thread(
-        target=get_organizarion, args=(org_data, dashboard, organizationId)
+        target=get_organization, args=(org_data, dashboard, organizationId)
     )
     t4.start()
 
@@ -88,7 +88,7 @@ def get_usage(dashboard, organizationId):
 
     logging.info("Combining collected data")
 
-    the_list = {}
+    the_dict = {}
     values_list = [
         "name",
         "model",
@@ -102,43 +102,47 @@ def get_usage(dashboard, organizationId):
         "usingCellularFailover",
     ]
     for device in devices:
-        the_list[device["serial"]] = {}
-        the_list[device["serial"]]["orgName"] = org_data["name"]
+        device_serial = device["serial"]
+        the_dict[device_serial] = {}
+        the_dict[device_serial]["orgName"] = org_data["name"]
         for value in values_list:
-            try:
-                if device[value] is not None:
-                    the_list[device["serial"]][value] = device[value]
-            except KeyError:
-                pass
+            if value in device:
+                the_dict[device_serial][value] = device[value]
 
-    for device in devicesdtatuses:
-        try:
-            the_list[
-                device["serial"]
-            ]  # should give me KeyError if devices was not picket up by previous search.
-        except KeyError:
-            the_list[device["serial"]] = {"missing data": True}
+    for device in device_statuses:
+        device_serial = device["serial"]
+        device_uplink = device["uplink"]
+        if device_serial not in the_dict:
+            the_dict[device_serial] = {"missing data": True}
 
-        the_list[device["serial"]]["latencyMs"] = device["timeSeries"][-1]["latencyMs"]
-        the_list[device["serial"]]["lossPercent"] = device["timeSeries"][-1][
-            "lossPercent"
-        ]
+        if "uplinks" not in the_dict[device_serial]:
+            the_dict[device_serial]["uplinks"] = {}
 
-    for device in uplinkstatuses:
-        try:
-            the_list[
-                device["serial"]
-            ]  # should give me KeyError if devices was not picket up by previous search.
-        except KeyError:
-            the_list[device["serial"]] = {"missing data": True}
-        the_list[device["serial"]]["uplinks"] = {}
+        the_dict[device_serial]["uplinks"][device_uplink] = {
+            "latencyMs": device["timeSeries"][-1]["latencyMs"],
+            "lossPercent": device["timeSeries"][-1]["lossPercent"],
+        }
+
+    for device in uplink_statuses:
+        device_serial = device["serial"]
+
+        if device_serial not in the_dict:
+            the_dict[device_serial] = {"missing data": True}
+
+        if "uplinks" not in the_dict[device_serial]:
+            the_dict[device_serial]["uplinks"] = {}
+
         for uplink in device["uplinks"]:
-            the_list[device["serial"]]["uplinks"][uplink["interface"]] = uplink[
+            device_uplink = uplink["interface"]
+            if device_uplink not in the_dict[device_serial]["uplinks"]:
+                the_dict[device_serial]["uplinks"][device_uplink] = {}
+
+            the_dict[device_serial]["uplinks"][device_uplink]["status"] = uplink[
                 "status"
             ]
 
     logging.info("Done")
-    return the_list
+    return the_dict
 
 
 # end of get_usage()
@@ -146,8 +150,10 @@ def get_usage(dashboard, organizationId):
 
 REQUEST_TIME = Gauge("request_processing_seconds", "Time spent processing request")
 label_list = ["serial", "name", "networkId", "orgName", "orgId"]
-latency_metric = Gauge("meraki_device_latency", "Latency", label_list)
-loss_metric = Gauge("meraki_device_loss_percent", "Loss Percent", label_list)
+latency_metric = Gauge("meraki_device_latency", "Latency", label_list + ["uplink"])
+loss_metric = Gauge(
+    "meraki_device_loss_percent", "Loss Percent", label_list + ["uplink"]
+)
 device_status_metric = Gauge("meraki_device_status", "Device Status", label_list)
 cellular_failover_metric = Gauge(
     "meraki_device_using_cellular_failover", "Cellular Failover", label_list
@@ -176,7 +182,7 @@ def update_metrics():
          'wan1Ip': '1.2.3.4'}
     """
     # uplink statuses
-    uplink_statuses = {
+    uplink_status_mappings = {
         "active": 0,
         "ready": 1,
         "connecting": 2,
@@ -191,36 +197,9 @@ def update_metrics():
                 if host_stats[host]["name"] != ""
                 else host_stats[host]["mac"]
             )
-            latency_metric.labels(
-                host,
-                name_label,
-                host_stats[host]["networkId"],
-                host_stats[host]["orgName"],
-                organizationId,
-            )
         except KeyError:
             break
-        # values={ 'latencyMs': lambda a : str(a)}
-        try:
-            if host_stats[host]["latencyMs"] is not None:
-                latency_metric.labels(
-                    host,
-                    name_label,
-                    host_stats[host]["networkId"],
-                    host_stats[host]["orgName"],
-                    organizationId,
-                ).set(host_stats[host]["latencyMs"] / 1000)
 
-            if host_stats[host]["lossPercent"] is not None:
-                loss_metric.labels(
-                    host,
-                    name_label,
-                    host_stats[host]["networkId"],
-                    host_stats[host]["orgName"],
-                    organizationId,
-                ).set(host_stats[host]["lossPercent"])
-        except KeyError:
-            pass
         try:
             device_status_metric.labels(
                 host,
@@ -231,6 +210,7 @@ def update_metrics():
             ).set("1" if host_stats[host]["status"] == "online" else "0")
         except KeyError:
             pass
+
         try:
             cellular_failover_metric.labels(
                 host,
@@ -241,16 +221,39 @@ def update_metrics():
             ).set("1" if host_stats[host]["usingCellularFailover"] else "0")
         except KeyError:
             pass
+
         if "uplinks" in host_stats[host]:
-            for uplink in host_stats[host]["uplinks"].keys():
-                device_uplink_status_metric.labels(
-                    host,
-                    name_label,
-                    host_stats[host]["networkId"],
-                    host_stats[host]["orgName"],
-                    organizationId,
-                    uplink,
-                ).set(uplink_statuses[host_stats[host]["uplinks"][uplink]])
+            uplinks_dict = host_stats[host]["uplinks"]
+            for uplink in uplinks_dict.keys():
+                if "status" in uplinks_dict[uplink]:
+                    device_uplink_status_metric.labels(
+                        host,
+                        name_label,
+                        host_stats[host]["networkId"],
+                        host_stats[host]["orgName"],
+                        organizationId,
+                        uplink,
+                    ).set(uplink_status_mappings[uplinks_dict[uplink]["status"]])
+
+                if "latencyMs" in uplinks_dict[uplink]:
+                    latency_metric.labels(
+                        host,
+                        name_label,
+                        host_stats[host]["networkId"],
+                        host_stats[host]["orgName"],
+                        organizationId,
+                        uplink,
+                    ).set(uplinks_dict[uplink]["latencyMs"] / 1000)
+
+                if "lossPercent" in uplinks_dict[uplink]:
+                    loss_metric.labels(
+                        host,
+                        name_label,
+                        host_stats[host]["networkId"],
+                        host_stats[host]["orgName"],
+                        organizationId,
+                        uplink,
+                    ).set(uplinks_dict[uplink]["lossPercent"])
 
 
 if __name__ == "__main__":
