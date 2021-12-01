@@ -46,6 +46,21 @@ def get_uplink_statuses(uplinkstatuses, dashboard, organizationId):
         logging.warning(api_error)
 
 
+def get_uplink_usage(network_id, dashboard):
+    try:
+        uplink_usage_list = dashboard.appliance.getNetworkApplianceUplinksUsageHistory(networkId=network_id)
+        uplink_usage_dict = {}
+        for interface in uplink_usage_list[-1]["byInterface"]:
+            uplink_usage_dict[interface["interface"]] = {
+                "sent": interface["sent"],
+                "received": interface["received"]
+            }
+        logging.info(f"Got {len(uplink_usage_dict.keys())} Uplink Usages for network {network_id}")
+        return uplink_usage_dict
+    except meraki.APIError as api_error:
+        logging.warning(api_error)
+
+
 def get_organization(org_data, dashboard, organizationId):
     try:
         org_data.update(
@@ -85,6 +100,12 @@ def get_usage(dashboard, organizationId):
     t2.join()
     t3.join()
     t4.join()
+
+    uplink_usage_dict = {}
+    for device in devices:
+        network_id = device["networkId"]
+        if network_id not in uplink_usage_dict:
+            uplink_usage_dict[network_id] = get_uplink_usage(network_id, dashboard)
 
     logging.info("Combining collected data")
 
@@ -141,6 +162,11 @@ def get_usage(dashboard, organizationId):
                 "status"
             ]
 
+            if device["networkId"] in uplink_usage_dict:
+                if device_uplink in uplink_usage_dict[device["networkId"]]:
+                    the_dict[device_serial]["uplinks"][device_uplink]["sent"] = uplink_usage_dict[device["networkId"]][device_uplink]["sent"]
+                    the_dict[device_serial]["uplinks"][device_uplink]["received"] = uplink_usage_dict[device["networkId"]][device_uplink]["received"]
+
     logging.info("Done")
     return the_dict
 
@@ -161,7 +187,12 @@ cellular_failover_metric = Gauge(
 device_uplink_status_metric = Gauge(
     "meraki_device_uplink_status", "Device Uplink Status", label_list + ["uplink"]
 )
-
+device_uplink_sent_metric = Gauge(
+    "meraki_device_uplink_sent", "Device Uplink Sent", label_list + ["uplink"]
+)
+device_uplink_received_metric = Gauge(
+    "meraki_device_uplink_received", "Device Uplink Received", label_list + ["uplink"]
+)
 
 @REQUEST_TIME.time()
 def update_metrics():
@@ -225,36 +256,28 @@ def update_metrics():
         if "uplinks" in host_stats[host]:
             uplinks_dict = host_stats[host]["uplinks"]
             for uplink in uplinks_dict.keys():
+                uplink_label_list = [
+                    host,
+                    name_label,
+                    host_stats[host]["networkId"],
+                    host_stats[host]["orgName"],
+                    organizationId,
+                    uplink,
+                ]
                 if "status" in uplinks_dict[uplink]:
-                    device_uplink_status_metric.labels(
-                        host,
-                        name_label,
-                        host_stats[host]["networkId"],
-                        host_stats[host]["orgName"],
-                        organizationId,
-                        uplink,
-                    ).set(uplink_status_mappings[uplinks_dict[uplink]["status"]])
+                    device_uplink_status_metric.labels(*uplink_label_list).set(uplink_status_mappings[uplinks_dict[uplink]["status"]])
 
                 if "latencyMs" in uplinks_dict[uplink]:
-                    latency_metric.labels(
-                        host,
-                        name_label,
-                        host_stats[host]["networkId"],
-                        host_stats[host]["orgName"],
-                        organizationId,
-                        uplink,
-                    ).set(uplinks_dict[uplink]["latencyMs"] / 1000)
+                    latency_metric.labels(*uplink_label_list).set(uplinks_dict[uplink]["latencyMs"] / 1000)
 
                 if "lossPercent" in uplinks_dict[uplink]:
-                    loss_metric.labels(
-                        host,
-                        name_label,
-                        host_stats[host]["networkId"],
-                        host_stats[host]["orgName"],
-                        organizationId,
-                        uplink,
-                    ).set(uplinks_dict[uplink]["lossPercent"])
+                    loss_metric.labels(*uplink_label_list).set(uplinks_dict[uplink]["lossPercent"])
 
+                if "sent" in uplinks_dict[uplink]:
+                    device_uplink_sent_metric.labels(*uplink_label_list).set(uplinks_dict[uplink]["sent"])
+
+                if "received" in uplinks_dict[uplink]:
+                    device_uplink_received_metric.labels(*uplink_label_list).set(uplinks_dict[uplink]["received"])
 
 if __name__ == "__main__":
     logging.basicConfig(
