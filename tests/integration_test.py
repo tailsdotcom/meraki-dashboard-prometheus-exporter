@@ -47,13 +47,9 @@ class Test(unittest.TestCase):
         cls.api_exporter.terminate()
         cls.mock_api.terminate()
 
-    # def test_get_organizations(self):
-    #    response = requests.get('http://127.0.0.1:9822/organizations')
-    #   self.assertEqual(response.text, '- targets:\n   - 1234\n')
-
     def test_get_metrics(self):
         response = requests.get(
-            "http://127.0.0.1:9822/?target=1234",
+            "http://127.0.0.1:9822/",
             headers={"accept": "application/openmetrics-text"},
         )
 
@@ -61,11 +57,10 @@ class Test(unittest.TestCase):
         # Validate against OpenMetrics Spec and check all expected metrics are present and correct
         for family in parser.text_string_to_metric_families(response.text):
             for sample in family.samples:
-                if sample[0] == "meraki_device_latency":
-                    self.assertEqual(sample[1]["name"], "My AP")
+                if sample[0] == "meraki_device_uplink_latency":
+                    self.assertEqual(sample[1]["deviceName"], "My AP")
                     self.assertEqual(sample[1]["networkId"], "N_24329156")
-                    self.assertEqual(sample[1]["orgId"], "1234")
-                    self.assertEqual(sample[1]["orgName"], "My organization")
+                    self.assertEqual(sample[1]["networkName"], "My network")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
                     if sample[1]["uplink"] == "wan1":
                         self.assertEqual(sample[2], 0.19490000000000002)
@@ -74,11 +69,10 @@ class Test(unittest.TestCase):
                         self.assertEqual(sample[2], 0.2555)
                         if_count += 1
 
-                elif sample[0] == "meraki_device_loss_percent":
-                    self.assertEqual(sample[1]["name"], "My AP")
+                elif sample[0] == "meraki_device_uplink_loss":
+                    self.assertEqual(sample[1]["deviceName"], "My AP")
                     self.assertEqual(sample[1]["networkId"], "N_24329156")
-                    self.assertEqual(sample[1]["orgId"], "1234")
-                    self.assertEqual(sample[1]["orgName"], "My organization")
+                    self.assertEqual(sample[1]["networkName"], "My network")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
                     if sample[1]["uplink"] == "wan1":
                         self.assertEqual(sample[2], 5.3)
@@ -88,28 +82,25 @@ class Test(unittest.TestCase):
                         if_count += 1
 
                 elif sample[0] == "meraki_device_status":
-                    self.assertEqual(sample[1]["name"], "My AP")
+                    self.assertEqual(sample[1]["deviceName"], "My AP")
                     self.assertEqual(sample[1]["networkId"], "N_24329156")
-                    self.assertEqual(sample[1]["orgId"], "1234")
-                    self.assertEqual(sample[1]["orgName"], "My organization")
+                    self.assertEqual(sample[1]["networkName"], "My network")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
                     self.assertEqual(sample[2], 1)
                     if_count += 1
 
                 elif sample[0] == "meraki_device_using_cellular_failover":
-                    self.assertEqual(sample[1]["name"], "My AP")
+                    self.assertEqual(sample[1]["deviceName"], "My AP")
                     self.assertEqual(sample[1]["networkId"], "N_24329156")
-                    self.assertEqual(sample[1]["orgId"], "1234")
-                    self.assertEqual(sample[1]["orgName"], "My organization")
+                    self.assertEqual(sample[1]["networkName"], "My network")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
                     self.assertEqual(sample[2], 0)
                     if_count += 1
 
                 elif sample[0] == "meraki_device_uplink_status":
-                    self.assertEqual(sample[1]["name"], "My AP")
+                    self.assertEqual(sample[1]["deviceName"], "My AP")
                     self.assertEqual(sample[1]["networkId"], "N_24329156")
-                    self.assertEqual(sample[1]["orgId"], "1234")
-                    self.assertEqual(sample[1]["orgName"], "My organization")
+                    self.assertEqual(sample[1]["networkName"], "My network")
                     self.assertEqual(sample[1]["serial"], "Q234-ABCD-5678")
 
                     if sample[1]["uplink"] == "wan1":

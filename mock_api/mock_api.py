@@ -8,26 +8,14 @@ def root():
     return "Herp derp I'm an API"
 
 
-@app.route("/api/v1/organizations")
-def get_organizations():
+@app.route("/api/v1/organizations/1234/networks")
+def get_organization_networks():
     return """[
-    {
-        "id": "1234",
-        "name": "My organization",
-        "url": "https://dashboard.meraki.com/o/VjjsAd/manage/organization/overview",
-        "api": { "enabled": true }
-    }
+  {
+    "id": "N_24329156",
+    "name": "My network"
+  }
 ]"""
-
-
-@app.route("/api/v1/organizations/1234")
-def get_organization():
-    return """{
-    "id": "1234",
-    "name": "My organization",
-    "url": "https://dashboard.meraki.com/o/VjjsAd/manage/organization/overview",
-    "api": { "enabled": true }
-}"""
 
 
 @app.route("/api/v1/organizations/1234/apiRequests/overview")
@@ -61,7 +49,8 @@ def get_organization_devices_statuses():
         "primaryDns": "8.8.8.8",
         "secondaryDns": "8.8.4.4",
         "productType": null,
-        "components": { "powerSupplies": [] }
+        "components": { "powerSupplies": [] },
+        "usingCellularFailover": false
     }
 ]"""
 
@@ -131,6 +120,26 @@ def get_organization_devices_uplink_statuses():
                 "connectionType": "4g",
                 "apn": "internet",
                 "iccid": "123456789"
+            }
+        ]
+    }
+]"""
+
+
+@app.route("/api/v1/networks/N_24329156/appliance/uplinks/usageHistory")
+def get_organization_network_uplink_usage():
+    return """[
+    {
+        "byInterface": [
+            {
+                "interface": "wan1",
+                "sent": "1111",
+                "received": "2222"
+            },
+            {
+                "interface": "cellular",
+                "sent": "3333",
+                "received": "4444"
             }
         ]
     }
