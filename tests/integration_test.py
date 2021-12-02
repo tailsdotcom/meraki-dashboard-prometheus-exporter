@@ -110,5 +110,25 @@ class Test(unittest.TestCase):
                         self.assertEqual(sample[2], 1)
                         if_count += 1
 
+                elif sample[0] == "meraki_network_uplink_sent":
+                    self.assertEqual(sample[1]["networkId"], "N_24329156")
+                    self.assertEqual(sample[1]["networkName"], "My network")
+                    if sample[1]["uplink"] == "wan1":
+                        self.assertEqual(sample[2], 1111)
+                        if_count += 1
+                    elif sample[1]["uplink"] == "cellular":
+                        self.assertEqual(sample[2], 3333)
+                        if_count += 1
+
+                elif sample[0] == "meraki_network_uplink_received":
+                    self.assertEqual(sample[1]["networkId"], "N_24329156")
+                    self.assertEqual(sample[1]["networkName"], "My network")
+                    if sample[1]["uplink"] == "wan1":
+                        self.assertEqual(sample[2], 2222)
+                        if_count += 1
+                    elif sample[1]["uplink"] == "cellular":
+                        self.assertEqual(sample[2], 4444)
+                        if_count += 1
+
         # Check all conditional paths are explored
-        self.assertEqual(if_count, 8)
+        self.assertEqual(if_count, 12)
