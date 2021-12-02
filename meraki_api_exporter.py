@@ -308,8 +308,9 @@ if __name__ == "__main__":
         "-o",
         metavar="ORG_ID",
         type=str,
-        help="The Meraki API Organization ID",
         required=True,
+        env_var="MERAKI_ORG_ID",
+        help="The Meraki API Organization ID",
     )
     args = vars(parser.parse_args())
     HTTP_PORT_NUMBER = args["p"]

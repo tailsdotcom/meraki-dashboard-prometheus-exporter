@@ -37,7 +37,7 @@ Exporter is listening on port 9822 on all interfaces by default
 ```
   -h, --help     show this help message and exit
   -k API_KEY     API Key (Required, can also be specified using `MERAKI_API_KEY` environment variable)
-  -o org_id      Meraki Organization ID number (Required, can also be specified using `ORG_ID` environment variable)
+  -o org_id      Meraki Organization ID number (Required, can also be specified using `MEARKI_ORG_ID` environment variable)
   -p http_port   HTTP port to listen for Prometheus scraper, default 9822
   -i bind_to_ip  IP address where HTTP server will listen, default all interfaces
 ```
