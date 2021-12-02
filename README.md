@@ -22,9 +22,9 @@ All metrics but __request_processing_seconds__ has following Labels
 | networkId | string | Network ID
 | networkName | string | Network name
 
-**meraki_network_uplink** metrics also carry `uplink` label containing uplink name.
-**meraki_device** metrics also carry `serial` and `deviceName` labels. Where name is not set, deviceName contains the MAC address.
-**meraki_device_uplink** metrics have all of the above labels.
+* **meraki_network_uplink** metrics also carry `uplink` label containing uplink name.
+* **meraki_device** metrics also carry `serial` and `deviceName` labels. Where name is not set, deviceName contains the MAC address.
+* **meraki_device_uplink** metrics have all of the above labels.
 
 ### How to Use
 ```
@@ -40,6 +40,7 @@ Exporter is listening on port 9822 on all interfaces by default
   -o org_id      Meraki Organization ID number (Required, can also be specified using `ORG_ID` environment variable)
   -p http_port   HTTP port to listen for Prometheus scraper, default 9822
   -i bind_to_ip  IP address where HTTP server will listen, default all interfaces
+```
 
 **example prometheus.yml**
 ```
