@@ -44,7 +44,6 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
         uplink_loss_and_latency = (
             dashboard.organizations.getOrganizationDevicesUplinksLossAndLatency(
                 organizationId=organization_id,
-                ip="8.8.8.8",
                 timespan="120",
                 total_pages="all",
             )
@@ -71,13 +70,13 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
                     ] = {}
 
                     latency_metric = uplink["timeSeries"][-1]["latencyMs"]
-                    if latency_metric:
+                    if latency_metric is not None:
                         network_devices_dict[network_id]["devices"][serial]["uplinks"][
                             uplink_name
                         ]["latency"] = (latency_metric / 1000)
 
                     loss_metric = uplink["timeSeries"][-1]["lossPercent"]
-                    if loss_metric:
+                    if loss_metric is not None:
                         network_devices_dict[network_id]["devices"][serial]["uplinks"][
                             uplink_name
                         ]["loss"] = loss_metric
@@ -240,32 +239,34 @@ def update_metrics():
                         network_id, network_name, device_serial, device_name
                     ).set("1" if device_details["usingCellularFailover"] else "0")
 
-            if "uplinks" in device_details:
-                for uplink_name, uplink_details in device_details["uplinks"].items():
-                    if "status" in uplink_details:
-                        device_uplink_status_metric.labels(
-                            network_id,
-                            network_name,
-                            device_serial,
-                            device_name,
-                            uplink_name,
-                        ).set(uplink_status_mappings[uplink_details["status"]])
-                    if "latency" in uplink_details:
-                        device_uplink_latency_metric.labels(
-                            network_id,
-                            network_name,
-                            device_serial,
-                            device_name,
-                            uplink_name,
-                        ).set(uplink_details["latency"])
-                    if "loss" in uplink_details:
-                        device_uplink_loss_metric.labels(
-                            network_id,
-                            network_name,
-                            device_serial,
-                            device_name,
-                            uplink_name,
-                        ).set(uplink_details["loss"])
+                if "uplinks" in device_details:
+                    for uplink_name, uplink_details in device_details[
+                        "uplinks"
+                    ].items():
+                        if "status" in uplink_details:
+                            device_uplink_status_metric.labels(
+                                network_id,
+                                network_name,
+                                device_serial,
+                                device_name,
+                                uplink_name,
+                            ).set(uplink_status_mappings[uplink_details["status"]])
+                        if "latency" in uplink_details:
+                            device_uplink_latency_metric.labels(
+                                network_id,
+                                network_name,
+                                device_serial,
+                                device_name,
+                                uplink_name,
+                            ).set(uplink_details["latency"])
+                        if "loss" in uplink_details:
+                            device_uplink_loss_metric.labels(
+                                network_id,
+                                network_name,
+                                device_serial,
+                                device_name,
+                                uplink_name,
+                            ).set(uplink_details["loss"])
 
 
 if __name__ == "__main__":
