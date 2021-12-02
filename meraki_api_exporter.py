@@ -65,10 +65,15 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
                         network_devices_dict[network_id]["devices"][serial][
                             "uplinks"
                         ] = {}
+
+                    latency_metric = uplink["timeSeries"][-1]["latencyMs"]
+                    if latency_metric:
+                        latency_metric = latency_metric / 1000
+
                     network_devices_dict[network_id]["devices"][serial]["uplinks"][
                         uplink_name
                     ] = {
-                        "latency": uplink["timeSeries"][-1]["latencyMs"] / 1000,
+                        "latency": latency_metric,
                         "loss": uplink["timeSeries"][-1]["lossPercent"],
                     }
     except meraki.APIError as api_error:
@@ -298,7 +303,7 @@ if __name__ == "__main__":
         metavar="ORG_ID",
         type=str,
         help="The Meraki API Organization ID",
-        default="1234",
+        required=True,
     )
     args = vars(parser.parse_args())
     HTTP_PORT_NUMBER = args["p"]

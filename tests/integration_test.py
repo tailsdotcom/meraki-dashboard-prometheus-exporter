@@ -24,6 +24,8 @@ class Test(unittest.TestCase):
                     "127.0.0.1",
                     "-m",
                     "http://127.0.0.1:9823/api/v1",
+                    "-o",
+                    "1234"
                 ]
             )
 
