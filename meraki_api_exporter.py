@@ -66,16 +66,22 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
                             "uplinks"
                         ] = {}
 
-                    latency_metric = uplink["timeSeries"][-1]["latencyMs"]
-                    if latency_metric:
-                        latency_metric = latency_metric / 1000
-
                     network_devices_dict[network_id]["devices"][serial]["uplinks"][
                         uplink_name
-                    ] = {
-                        "latency": latency_metric,
-                        "loss": uplink["timeSeries"][-1]["lossPercent"],
-                    }
+                    ] = {}
+
+                    latency_metric = uplink["timeSeries"][-1]["latencyMs"]
+                    if latency_metric:
+                        network_devices_dict[network_id]["devices"][serial]["uplinks"][
+                            uplink_name
+                        ]["latency"] = (latency_metric / 1000)
+
+                    loss_metric = uplink["timeSeries"][-1]["lossPercent"]
+                    if loss_metric:
+                        network_devices_dict[network_id]["devices"][serial]["uplinks"][
+                            uplink_name
+                        ]["loss"] = loss_metric
+
     except meraki.APIError as api_error:
         logging.warning(api_error)
 
