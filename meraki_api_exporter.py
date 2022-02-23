@@ -12,10 +12,11 @@ def get_networks(network_devices_dict, dashboard, organization_id):
             organizationId=organization_id, total_pages="all"
         )
         for network in networks:
-            network_id = network["id"]
-            if network_id not in network_devices_dict:
-                network_devices_dict[network_id] = {}
-            network_devices_dict[network_id] = network
+            network_id = network.get("id")
+            if network_id:
+                if network_id not in network_devices_dict:
+                    network_devices_dict[network_id] = {}
+                network_devices_dict[network_id] = network
     except meraki.APIError as api_error:
         logging.warning(api_error)
 
@@ -28,13 +29,14 @@ def get_devices(network_devices_dict, dashboard, organization_id):
         logging.info(f"Got {len(devices_statuses)} Devices")
 
         for device in devices_statuses:
-            network_id = device["networkId"]
-            serial = device["serial"]
-            if network_id not in network_devices_dict:
-                network_devices_dict[network_id] = {}
-            if "devices" not in network_devices_dict[network_id]:
-                network_devices_dict[network_id]["devices"] = {}
-            network_devices_dict[network_id]["devices"][serial] = device
+            network_id = device.get("networkId")
+            serial = device.get("serial")
+            if network_id and serial:
+                if network_id not in network_devices_dict:
+                    network_devices_dict[network_id] = {}
+                if "devices" not in network_devices_dict[network_id]:
+                    network_devices_dict[network_id]["devices"] = {}
+                network_devices_dict[network_id]["devices"][serial] = device
     except meraki.APIError as api_error:
         logging.warning(api_error)
 
@@ -52,14 +54,14 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
         logging.info(f"Got {len(uplink_loss_and_latency)} Device Statuses")
 
         for uplink in uplink_loss_and_latency:
-            network_id = uplink["networkId"]
-            serial = uplink["serial"]
-            uplink_name = uplink["uplink"]
-            if network_id in network_devices_dict:
+            network_id = uplink.get("networkId")
+            serial = uplink.get("serial")
+            uplink_name = uplink.get("uplink")
+            if serial and uplink_name and network_id in network_devices_dict:
                 if serial in network_devices_dict[network_id]["devices"]:
                     if (
-                        "uplinks"
-                        not in network_devices_dict[network_id]["devices"][serial]
+                            "uplinks"
+                            not in network_devices_dict[network_id]["devices"][serial]
                     ):
                         network_devices_dict[network_id]["devices"][serial][
                             "uplinks"
@@ -93,31 +95,29 @@ def get_uplink_statuses(network_devices_dict, dashboard, organization_id):
         logging.info(f"Got {len(uplink_statuses)} Uplink Statuses")
 
         for device in uplink_statuses:
-            network_id = device["networkId"]
-            serial = device["serial"]
+            network_id = device.get("networkId")
+            serial = device.get("serial")
             if network_id in network_devices_dict:
                 if serial in network_devices_dict[network_id]["devices"]:
                     if (
-                        "uplinks"
-                        not in network_devices_dict[network_id]["devices"][serial]
+                            "uplinks"
+                            not in network_devices_dict[network_id]["devices"][serial]
                     ):
                         network_devices_dict[network_id]["devices"][serial][
                             "uplinks"
                         ] = {}
                     for uplink in device["uplinks"]:
-                        uplink_name = uplink["interface"]
-                        if (
-                            uplink_name
-                            not in network_devices_dict[network_id]["devices"][serial][
-                                "uplinks"
-                            ]
-                        ):
+                        uplink_name = uplink.get("interface")
+                        if uplink_name and uplink_name not in network_devices_dict[network_id]["devices"][serial][
+                            "uplinks"]:
                             network_devices_dict[network_id]["devices"][serial][
                                 "uplinks"
                             ][uplink_name] = {}
-                        network_devices_dict[network_id]["devices"][serial]["uplinks"][
-                            uplink_name
-                        ]["status"] = uplink["status"]
+                        uplink_status = uplink.get("status")
+                        if uplink_status:
+                            network_devices_dict[network_id]["devices"][serial]["uplinks"][
+                                uplink_name
+                            ]["status"] = uplink_status
     except meraki.APIError as api_error:
         logging.warning(api_error)
 
@@ -135,9 +135,10 @@ def get_uplink_usage(network_devices_dict, dashboard):
 
             interface_dict = uplink_usage_list[-1]["byInterface"]
             for interface in interface_dict:
-                network_devices_dict[network_id]["interfaces"][
-                    interface["interface"]
-                ] = {"sent": interface["sent"], "received": interface["received"]}
+                if interface.get("sent") is not None and interface.get("received") is not None:
+                    network_devices_dict[network_id]["interfaces"][
+                        interface["interface"]
+                    ] = {"sent": interface["sent"], "received": interface["received"]}
             logging.info(
                 f"Got {len(interface_dict)} Uplink Usages for network {network_id}"
             )
@@ -218,6 +219,7 @@ def update_metrics():
                 network_uplink_sent_metric.labels(
                     network_id, network_name, uplink_name
                 ).set(uplink_details["sent"])
+
                 network_uplink_received_metric.labels(
                     network_id, network_name, uplink_name
                 ).set(uplink_details["received"])
