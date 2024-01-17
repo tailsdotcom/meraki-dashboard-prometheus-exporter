@@ -1,25 +1,29 @@
-name: Build and publish a Docker image to ghcr.io
+permissions:
+  id-token: write # required to use OIDC authentication
+  contents: read # required to checkout the code from the repo
+
+name: Build Image and Push to ECR
+
+# Only run one deployment at a time for a given branch
+concurrency: ci-${{ github.ref }}
+
 on:
-
-  # publish on releases, e.g. v2.1.13 (image tagged as "2.1.13" - "v" prefix is removed)
-  release:
-    types: [ published ]
-
-  # publish on pushes to the main branch (image tagged as "latest")
   push:
-    branches:
-      - master
+  workflow_dispatch:
 
 jobs:
-  docker_publish:
-    runs-on: "ubuntu-20.04"
+  build:
+    name: Build and Push
+    uses: tailsdotcom/actions/.github/workflows/build-container.yml@main
+    with:
+      aws_role: ${{ vars.AWS_ACCOUNT_NUMBER }}:role/ci-meraki-dashboard-prometheus-exporter
+      image: ${{ vars.AWS_ACCOUNT_NUMBER }}.dkr.ecr.eu-west-1.amazonaws.com/infrastructure-engineering/meraki-dashboard-prometheus-exporter
 
-    steps:
-      - uses: actions/checkout@v2
-
-      # https://github.com/marketplace/actions/push-to-ghcr
-      - name: Build and publish a Docker image for ${{ github.repository }}
-        uses: macbre/push-to-ghcr@master
-        with:
-          image_name: ${{ github.repository }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+  retag:
+    name: Retag for prod
+    if: github.ref_name == 'main'
+    uses: tailsdotcom/actions/.github/workflows/retag-image.yml@main
+    with:
+      aws_role: ${{ vars.AWS_ACCOUNT_NUMBER }}:role/ci-meraki-dashboard-prometheus-exporter
+      repository: infrastructure-engineering/meraki-dashboard-prometheus-exporter
+      environment: prod
