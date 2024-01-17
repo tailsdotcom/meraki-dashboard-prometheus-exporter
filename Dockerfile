@@ -1,15 +1,13 @@
-FROM python:3.9-slim
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
-# Set up /app as our runtime directory
-RUN mkdir /app
-WORKDIR /app
-
-# Install dependency
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# Run as non-root user
-RUN useradd -M app
+COPY Pipfile* .
+RUN pip install --upgrade pip pipenv
+RUN pipenv install --system
+RUN groupadd -g 10001 app && \
+    useradd -r -u 10001 -g app app && \
+    mkdir /usr/app && chown app:app /usr/app
+WORKDIR /usr/app
+COPY . /usr/app
 USER app
 
 # Add and run python app

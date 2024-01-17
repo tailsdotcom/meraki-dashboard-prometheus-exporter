@@ -1,5 +1,0 @@
-meraki~=1.0
-ConfigArgParse~=1.5
-requests~=2.0
-Flask~=2.0
-prometheus_client~=0.12

@@ -297,7 +297,7 @@ if __name__ == "__main__":
         "-i",
         metavar="bind_to_ip",
         type=str,
-        default="",
+        default="0.0.0.0",
         help="IP address where HTTP server will listen, default all interfaces",
     )
     parser.add_argument(
