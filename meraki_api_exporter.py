@@ -26,7 +26,7 @@ def get_devices(network_devices_dict, dashboard, organization_id):
         devices_statuses = dashboard.organizations.getOrganizationDevicesStatuses(
             organizationId=organization_id, total_pages="all"
         )
-        logging.info(f"Got {len(devices_statuses)} Devices")
+        logging.debug(f"Got {len(devices_statuses)} Devices")
 
         for device in devices_statuses:
             network_id = device.get("networkId")
@@ -51,7 +51,7 @@ def get_uplinks_loss_and_latency(network_devices_dict, dashboard, organization_i
             )
         )
 
-        logging.info(f"Got {len(uplink_loss_and_latency)} Device Statuses")
+        logging.debug(f"Got {len(uplink_loss_and_latency)} Device Statuses")
 
         for uplink in uplink_loss_and_latency:
             network_id = uplink.get("networkId")
@@ -92,7 +92,7 @@ def get_uplink_statuses(network_devices_dict, dashboard, organization_id):
         uplink_statuses = dashboard.appliance.getOrganizationApplianceUplinkStatuses(
             organizationId=organization_id, total_pages="all"
         )
-        logging.info(f"Got {len(uplink_statuses)} Uplink Statuses")
+        logging.debug(f"Got {len(uplink_statuses)} Uplink Statuses")
 
         for device in uplink_statuses:
             network_id = device.get("networkId")
@@ -139,7 +139,7 @@ def get_uplink_usage(network_devices_dict, dashboard):
                     network_devices_dict[network_id]["interfaces"][
                         interface["interface"]
                     ] = {"sent": interface["sent"], "received": interface["received"]}
-            logging.info(
+            logging.debug(
                 f"Got {len(interface_dict)} Uplink Usages for network {network_id}"
             )
         except meraki.APIError as api_error:
@@ -201,7 +201,7 @@ def update_metrics():
     organization_id = ORG_ID
 
     network_devices_dict = get_usage(dashboard, organization_id)
-    logging.info(f"Reporting on: {len(network_devices_dict)} networks")
+    logging.debug(f"Reporting on: {len(network_devices_dict)} networks")
 
     # uplink statuses
     uplink_status_mappings = {
